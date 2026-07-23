@@ -1,0 +1,73 @@
+# Applied as-is by terraform/cluster-addons/karpenter.tf's
+# kubectl_manifest.karpenter_node_pool (no templating needed — nothing in
+# here is environment-specific; the instance-type flexibility below is the
+# point, rather than pinning one type the way ../../terraform/eks.tf's
+# environment_config does for the fixed managed node group).
+#
+# NodePool — the Kubernetes-generic half of "how Karpenter scales nodes":
+# which instance shapes are acceptable, how much it's allowed to launch in
+# total, and when it's allowed to consolidate/remove nodes. Pairs with
+# EC2NodeClass "default" (ec2nodeclass.yaml.tpl) for the AWS-specific half.
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default
+spec:
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        # On-demand only, deliberately, unlike the flexible instance-shape
+        # requirements below: this project's standard-workers group is
+        # already ON_DEMAND (../../terraform/eks.tf), so Karpenter-launched
+        # nodes match that same reliability posture out of the box. Add
+        # "spot" to this list once you've verified Karpenter is working and
+        # you're ready to trade some interruption risk for lower cost —
+        # ../../terraform/karpenter.tf's enable_spot_termination = true
+        # already has the SQS queue/EventBridge rules in place for that.
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        # Instance families, not one hardcoded type — this is the actual
+        # payoff of Karpenter over a fixed-size managed node group: it
+        # picks the cheapest instance from this set that actually fits the
+        # Pending pod(s), instead of you guessing a size up front.
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["t", "m", "c"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["2"]
+
+      # Force a periodic replace so nodes don't run indefinitely on
+      # whatever AMI/kernel patch level they booted with — 30 days.
+      expireAfter: 720h
+
+  # Hard ceiling across every node this NodePool ever launches at once —
+  # a safety cap against a runaway Deployment/HPA requesting far more
+  # capacity than intended, not a sizing target. 100 vCPU / 400 GiB is
+  # generous headroom for this project's dev-scale sample app; tighten it
+  # once you know your workload's real ceiling, especially before
+  # reusing this file for prod.
+  limits:
+    cpu: "100"
+    memory: 400Gi
+
+  disruption:
+    # Consolidate (replace with cheaper instances, or remove entirely)
+    # whenever a node is empty or sized larger than its pods need —
+    # matches the HPA's own scaleDown stabilization philosophy in
+    # helm/devops-sample-api/templates/hpa.yaml: react to sustained
+    # low usage, not every momentary dip.
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m
