@@ -1,0 +1,17 @@
+{
+  "name": "devops-sample-api",
+  "version": "1.0.0",
+  "description": "DevOps Task Board — a small Node.js/Express app (JSON API + static UI) used to demonstrate a full CI/CD pipeline (Jenkins -> Docker -> ECR -> EKS -> ALB).",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": "^20.15.1"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "license": "MIT"
+}

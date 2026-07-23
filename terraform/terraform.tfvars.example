@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars and fill in your values. terraform.tfvars is
+# gitignored (see .gitignore) — nothing here is secret, but keeping
+# environment-specific values out of git avoids merge noise between people
+# running this in different accounts/IPs.
+
+aws_region   = "ap-south-1"
+project_name = "devops-assignment"
+
+jenkins_key_pair_name = "devops-assignment-key" # must already exist in the account (EC2 > Key Pairs)
+
+# Your IP only — find it with: curl -s https://checkip.amazonaws.com
+admin_cidr = "203.0.113.10/32"
+
+# Who can reach the EKS API endpoint. Include your admin_cidr; the
+# Jenkins host talks to the endpoint from inside the VPC via
+# cluster_endpoint_private_access, so it does NOT need to be listed here
+# even though its API calls still succeed.
+eks_public_access_cidrs = ["203.0.113.10/32"]

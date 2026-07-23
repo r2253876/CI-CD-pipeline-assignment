@@ -1,0 +1,8 @@
+# Same value across dev/staging/prod — it's the one shared state bucket,
+# not something that varies per environment. See ../bootstrap/'s output,
+# or ../backend.tf's comment.
+tfstate_bucket = "devops-assignment-tfstate-<ACCOUNT_ID>"
+
+# Only set this if it differs from the default (ap-south-1) — must match
+# the root stack's aws_region for the environment you're targeting.
+# aws_region = "ap-south-1"

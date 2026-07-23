@@ -1,0 +1,6 @@
+apiVersion: v2
+name: devops-sample-api
+description: Helm chart for the devops-sample-api CI/CD assignment (Deployment, Service, ALB Ingress, HPA, ConfigMap, Secret)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

@@ -1,0 +1,20 @@
+# Overrides for the staging environment.
+replicaCount: 2
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+
+config:
+  appEnv: staging
+  featureFlagBeta: "true"
+
+ingress:
+  host: "staging-api.example.com"
+
+# Must match local.app_secret_name for the "staging" workspace in
+# terraform/locals.tf — see the comment in values-dev.yaml.
+secret:
+  externalSecrets:
+    enabled: true
+    remoteRefKey: devops-sample-api/staging/api-key

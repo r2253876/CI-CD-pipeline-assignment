@@ -1,0 +1,36 @@
+# Overrides for the production environment.
+replicaCount: 3
+
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 60
+
+config:
+  appEnv: production
+  featureFlagBeta: "false"
+
+ingress:
+  host: "api.example.com"
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    # In production, terminate TLS at the ALB — set your real ACM cert ARN:
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:<ACCOUNT_ID>:certificate/<CERT_ID>
+    # alb.ingress.kubernetes.io/ssl-redirect: "443"
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 750m
+    memory: 512Mi
+
+# Must match local.app_secret_name for the "prod" workspace in
+# terraform/locals.tf — see the comment in values-dev.yaml.
+secret:
+  externalSecrets:
+    enabled: true
+    remoteRefKey: devops-sample-api/prod/api-key

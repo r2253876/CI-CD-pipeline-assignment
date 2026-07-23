@@ -1,0 +1,13 @@
+# Non-secret, environment-specific configuration.
+# Consumed by the Deployment as environment variables (envFrom).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "devops-sample-api.fullname" . }}-config
+  labels:
+    {{- include "devops-sample-api.labels" . | nindent 4 }}
+data:
+  APP_ENV: {{ .Values.config.appEnv | quote }}
+  APP_GREETING: {{ .Values.config.appGreeting | quote }}
+  FEATURE_FLAG_BETA: {{ .Values.config.featureFlagBeta | quote }}
+  APP_VERSION: {{ .Values.image.tag | quote }}

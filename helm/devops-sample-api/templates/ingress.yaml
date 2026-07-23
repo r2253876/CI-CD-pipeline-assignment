@@ -1,0 +1,39 @@
+{{- if .Values.ingress.enabled }}
+# Requires the AWS Load Balancer Controller running on the cluster; it
+# watches Ingress objects with ingressClassName: alb and provisions/updates
+# a real Application Load Balancer + target groups to match. See README
+# "AWS integration" and "ALB + Kubernetes traffic flow" sections.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "devops-sample-api.fullname" . }}
+  labels:
+    {{- include "devops-sample-api.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    {{- if .Values.ingress.host }}
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "devops-sample-api.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+    {{- else }}
+    - http:
+        paths:
+          - path: {{ .Values.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "devops-sample-api.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+    {{- end }}
+{{- end }}

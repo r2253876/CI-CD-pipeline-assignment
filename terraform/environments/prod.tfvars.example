@@ -1,0 +1,26 @@
+# Copy to prod.tfvars (gitignored) and fill in your values, then: 
+#
+#   terraform workspace new prod      # first time only
+#   terraform workspace select prod
+#   terraform apply -var-file=environments/prod.tfvars
+#
+# NOT YET APPLIED/TESTED by this project — dev is the only environment
+# that's actually been run end to end so far. Before running this for
+# real: read terraform/README.md's "Adding another environment" section,
+# review variables.tf's environment_config["prod"] sizing (currently
+# t3.large nodes, min 3/max 10 — a starting point, not a load-tested
+# number), and strongly consider narrowing admin_cidr/eks_public_access_cidrs
+# to a VPN or bastion range rather than a single IP that will inevitably
+# go stale.
+
+aws_region   = "ap-south-1"
+project_name = "devops-assignment"
+
+jenkins_key_pair_name = "devops-assignment" # must already exist in the account (EC2 > Key Pairs)
+
+# Prefer a VPN/office CIDR over a single home-IP /32 for prod — home IPs
+# change; re-running `terraform apply` just to update this every few
+# months is a real, recurring annoyance you can design around now.
+admin_cidr = "13.232.21.144/32"
+
+eks_public_access_cidrs = ["13.232.21.144/32"]

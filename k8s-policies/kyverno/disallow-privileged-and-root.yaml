@@ -1,0 +1,67 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged-and-root
+  annotations:
+    policies.kyverno.io/title: Disallow Privileged Containers and Root
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Baseline pod hardening: no privileged containers anywhere in the
+      cluster, and containers in this app's namespaces must explicitly
+      run as non-root. Matches the securityContext already set in
+      helm/devops-sample-api/values.yaml — this policy is what makes
+      that setting mandatory rather than merely the chart's default.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: no-privileged-containers
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Privileged containers are not allowed."
+        pattern:
+          spec:
+            containers:
+              - =(securityContext):
+                  =(privileged): "false"
+
+    - name: require-run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - devops-sample-api-dev
+                - devops-sample-api-staging
+                - devops-sample-api-prod
+      validate:
+        message: "Containers must set securityContext.runAsNonRoot: true."
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  runAsNonRoot: true
+
+    - name: no-privilege-escalation
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - devops-sample-api-dev
+                - devops-sample-api-staging
+                - devops-sample-api-prod
+      validate:
+        message: "Containers must set securityContext.allowPrivilegeEscalation: false."
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  allowPrivilegeEscalation: false

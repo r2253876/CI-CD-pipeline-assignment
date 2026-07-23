@@ -1,0 +1,35 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registry
+  annotations:
+    policies.kyverno.io/title: Restrict Image Registries
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Only images from this project's own ECR repository may run in the
+      devops-sample-api-* namespaces. Blocks pulling an arbitrary public
+      image (or a look-alike name in a different registry) even if
+      someone bypasses Jenkins entirely and applies a manifest by hand.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: allowed-registry-and-repo
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - devops-sample-api-dev
+                - devops-sample-api-staging
+                - devops-sample-api-prod
+      validate:
+        message: >-
+          Container images in this namespace must come from this
+          project's ECR repository (*.dkr.ecr.*.amazonaws.com/devops-sample-api).
+        pattern:
+          spec:
+            containers:
+              - image: "*.dkr.ecr.*.amazonaws.com/devops-sample-api*"

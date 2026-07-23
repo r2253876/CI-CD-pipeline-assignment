@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DevOps Task Board</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <h1>DevOps Task Board</h1>
+    </div>
+    <div id="status-pills" class="status-pills">
+      <span class="pill pill-muted" id="pill-env">env: …</span>
+      <span class="pill pill-muted" id="pill-version">version: …</span>
+      <span class="pill pill-muted" id="pill-flag">beta: …</span>
+      <span class="pill pill-muted" id="pill-secret">secret: …</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <section class="intro">
+      <p>
+        This board is the sample application the CI/CD pipeline builds, scans, signs, and deploys.
+        Every task below lives in memory in the running pod — refresh after a rolling deploy or a
+        pod restart and the list resets to its seed data, which is a deliberate trade-off for a
+        pipeline demo app, not an oversight. The pills above are read live from
+        <code>GET /api</code>, so they change with the environment (dev/staging/prod) this pod was
+        deployed into.
+      </p>
+    </section>
+
+    <section class="board">
+      <form id="task-form" class="task-form">
+        <input
+          id="task-input"
+          type="text"
+          maxlength="200"
+          placeholder="Add a task…"
+          autocomplete="off"
+          required
+        />
+        <button type="submit">Add</button>
+      </form>
+
+      <ul id="task-list" class="task-list" aria-live="polite"></ul>
+
+      <p id="empty-state" class="empty-state" hidden>No tasks yet — add one above.</p>
+      <p id="error-state" class="error-state" hidden></p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>devops-sample-api</span>
+    <span class="dot">·</span>
+    <a href="/health">/health</a>
+    <span class="dot">·</span>
+    <a href="/api">/api</a>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

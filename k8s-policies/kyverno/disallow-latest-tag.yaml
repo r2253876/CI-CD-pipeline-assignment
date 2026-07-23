@@ -1,0 +1,38 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow Latest Tag
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Rejects any container image with no tag at all (which Docker
+      resolves to :latest) or an explicit :latest tag. Cluster-wide, not
+      namespace-scoped — this is a baseline hygiene rule, independent of
+      which app it is. Same check policy/kubernetes.rego already runs in
+      CI (Jenkinsfile's "OPA Policy Check" stage); this is the in-cluster
+      backstop for anything that skips Jenkins.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-non-latest-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Using a mutable image tag ('latest', or no tag at all) is not allowed — pin to a specific tag or digest."
+        foreach:
+          - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ contains(element.image, ':') }}"
+                    operator: Equals
+                    value: false
+                  - key: "{{ split(element.image, ':')[-1] }}"
+                    operator: Equals
+                    value: "latest"

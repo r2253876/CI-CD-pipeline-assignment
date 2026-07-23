@@ -1,0 +1,152 @@
+# Default values for devops-sample-api.
+# Environment-specific overrides live in values-<env>.yaml and are layered
+# on top of this file via `helm upgrade --values values.yaml --values values-<env>.yaml`.
+
+replicaCount: 2
+
+image:
+  repository: <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/devops-sample-api
+  tag: latest
+  # Set by the Jenkinsfile's Deploy stage to the exact sha256 digest that
+  # was scanned, signed (cosign), and verified earlier in the SAME build —
+  # when set, the rendered image reference becomes repo:tag@digest, so the
+  # cluster pulls the precise, content-addressed image those checks ran
+  # against, not whatever a mutable tag happens to point to right now.
+  # Left empty for standalone/local chart use (see values.yaml's secret
+  # section for the same "installable standalone" pattern).
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# --- Deployment strategy: rolling update ---
+# maxUnavailable: 0 guarantees we never drop below full desired capacity
+# while a new revision rolls out; maxSurge: 1 adds one extra pod at a time
+# so traffic always has a healthy pod to land on. Combined with the
+# readiness probe below, this gives a zero-downtime rolling deploy.
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 1
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+# --- ALB Ingress (via the AWS Load Balancer Controller) ---
+# Requires the AWS Load Balancer Controller to be installed on the cluster
+# (see README "AWS integration" section for the exact install commands).
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    # Uncomment and set once you have an ACM cert for HTTPS termination at the ALB:
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:<ACCOUNT_ID>:certificate/<CERT_ID>
+    # alb.ingress.kubernetes.io/ssl-redirect: "443"
+  host: "" # e.g. api.example.com — leave empty to match all hosts
+  path: /
+
+# --- Health checks used by Kubernetes itself (independent of the ALB's own checks above) ---
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+  readiness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# --- Pod/container hardening ---
+# Checked independently by two layers: policy/kubernetes.rego (Conftest,
+# in CI, against `helm template` output) and the Kyverno ClusterPolicies
+# in k8s-policies/kyverno/ (admission-time, in the cluster). Both must
+# agree these are set correctly, or the corresponding stage/admission
+# fails.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  privileged: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# --- Horizontal Pod Autoscaler ---
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# --- Non-secret, environment-specific application config ---
+config:
+  appEnv: development
+  appGreeting: "Hello from the DevOps sample API"
+  featureFlagBeta: "false"
+
+# --- Secrets ---
+# This base file defaults to a MOCKED plaintext Kubernetes Secret so the
+# chart is installable standalone (kind/minikube, a cluster with no AWS
+# integration, a quick local smoke test) with zero external dependencies.
+#
+# Every environment provisioned by terraform/ (dev, staging, prod) OVERRIDES
+# this in its values-<env>.yaml to externalSecrets.enabled: true, PLUS its
+# own remoteRefKey — the real, production-grade path. In that mode the
+# value below is never used: terraform/secrets.tf generates a random value
+# and stores it in AWS Secrets Manager, and External Secrets Operator
+# (installed by terraform/k8s-addons.tf, authenticated via the IRSA role in
+# terraform/iam.tf — no AWS keys anywhere in the cluster) syncs it into a
+# real Kubernetes Secret with this same name on a 1h refresh interval.
+#
+# remoteRefKey below is a placeholder, not a real path — since each
+# environment now provisions FULLY SEPARATE infrastructure (its own AWS
+# account-wide-unique Secrets Manager secret, not just its own namespace
+# on a shared cluster), the real key is environment-specific
+# (devops-sample-api/dev/api-key, /staging/, /prod/ — see
+# terraform/locals.tf's local.app_secret_name) and lives in each
+# values-<env>.yaml, not here. See the "Production-Grade Security &
+# Terraform Runbook" document, section "Secrets flow".
+secret:
+  create: true
+  apiKey: "mock-secret-not-set-change-me"
+  externalSecrets:
+    enabled: false
+    secretStoreRef: aws-secretsmanager
+    remoteRefKey: devops-sample-api/<environment>/api-key
+
+serviceAccount:
+  create: true
+  # Set to an IAM role ARN (via IRSA) if the app itself needs AWS permissions,
+  # e.g. to read Secrets Manager directly instead of via External Secrets Operator.
+  annotations: {}
+  #   eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/devops-sample-api-irsa
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

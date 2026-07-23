@@ -1,0 +1,27 @@
+# Copy to dev.tfvars (gitignored — see terraform/.gitignore) and fill in
+# your values, then:
+#
+#   terraform workspace new dev      # first time only
+#   terraform workspace select dev
+#   terraform apply -var-file=environments/dev.tfvars
+#
+# Nothing in this file is secret, but keeping account/IP-specific values
+# out of git avoids merge noise between people running this in different
+# AWS accounts. Sizing (instance types, node counts) is NOT set here — it
+# comes from variables.tf's environment_config map, keyed by workspace
+# name, so it can't drift out of sync with which environment you're
+# actually applying.
+
+aws_region   = "ap-south-1"
+project_name = "devops-assignment"
+
+jenkins_key_pair_name = "devops-assignment-dev-key" # must already exist in the account (EC2 > Key Pairs)
+
+# Your IP only — find it with: curl -s https://checkip.amazonaws.com
+admin_cidr = "13.232.21.144/32"
+
+# Who can reach this environment's EKS API endpoint. Include your
+# admin_cidr; the Jenkins host talks to the endpoint from inside its own
+# VPC via cluster_endpoint_private_access, so it does NOT need to be
+# listed here even though its API calls still succeed.
+eks_public_access_cidrs = ["13.232.21.144/32"]

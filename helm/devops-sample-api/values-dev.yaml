@@ -1,0 +1,33 @@
+# Overrides for the dev environment.
+replicaCount: 1
+
+autoscaling:
+  minReplicas: 1
+  maxReplicas: 3
+
+config:
+  appEnv: development
+  featureFlagBeta: "true"
+
+ingress:
+  host: "dev-api.example.com"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
+
+# terraform/ always provisions the Secrets Manager secret + ClusterSecretStore
+# for every environment, so even dev uses the real synced secret rather
+# than the chart's mocked default. remoteRefKey must match
+# local.app_secret_name for the "dev" workspace in terraform/locals.tf —
+# each environment now has fully separate infrastructure (its own
+# Secrets Manager secret, not just its own namespace), so this can no
+# longer be the shared default in values.yaml.
+secret:
+  externalSecrets:
+    enabled: true
+    remoteRefKey: devops-sample-api/dev/api-key

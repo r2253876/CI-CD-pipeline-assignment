@@ -1,0 +1,38 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-probes
+  annotations:
+    policies.kyverno.io/title: Require Liveness and Readiness Probes
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Every container in the app's namespaces must define a
+      livenessProbe and a readinessProbe — both the rolling-update
+      strategy and the ALB's own health checks depend on Kubernetes
+      actually knowing when a pod is ready.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: validate-probes
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - devops-sample-api-dev
+                - devops-sample-api-staging
+                - devops-sample-api-prod
+      validate:
+        message: "Every container must define both a livenessProbe and a readinessProbe."
+        pattern:
+          spec:
+            containers:
+              - livenessProbe:
+                  httpGet:
+                    path: "?*"
+                readinessProbe:
+                  httpGet:
+                    path: "?*"

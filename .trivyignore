@@ -1,0 +1,7 @@
+# Trivy vulnerability IDs (CVE-... or GHSA-...) accepted as risk here, one
+# per line, WITH A REASON — never add an entry without one. Read by both
+# the "Dependency & Filesystem Scan" and "Docker Image Scan" Jenkins
+# stages (trivy fs --ignorefile / trivy image --ignorefile point here).
+#
+# Example (remove once a real accepted CVE exists):
+# CVE-2023-00000   # affects a dev-only transitive dep, not present in the runtime image; re-review by 2026-12-31

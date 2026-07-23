@@ -1,0 +1,26 @@
+# Copy to staging.tfvars (gitignored) and fill in your values, then:
+#
+#   terraform workspace new staging      # first time only
+#   terraform workspace select staging
+#   terraform apply -var-file=environments/staging.tfvars
+#
+# NOT YET APPLIED/TESTED by this project — dev is the only environment
+# that's actually been run end to end so far. This file exists so staging
+# is a `terraform apply` away, not a design exercise, once you're ready.
+# See terraform/README.md, "Adding another environment," before running
+# this for the first time — in particular, decide whether staging should
+# share dev's VPC CIDR (10.42.0.0/16 default, fine for two independent,
+# unpeered VPCs) or use a distinct range if you plan to ever peer/connect
+# them.
+
+aws_region   = "ap-south-1"
+project_name = "devops-assignment"
+
+jenkins_key_pair_name = "devops-assignment-staging-key" # must already exist in the account (EC2 > Key Pairs)
+
+# Your IP, or your team's shared VPN/office range — narrower than dev's
+# is often appropriate here, since staging typically holds more
+# realistic/sensitive data than a personal dev sandbox.
+admin_cidr = "203.0.113.10/32"
+
+eks_public_access_cidrs = ["203.0.113.10/32"]
