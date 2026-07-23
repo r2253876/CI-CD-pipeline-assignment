@@ -41,6 +41,9 @@ applied so far.
 │   ├── require-resource-limits.yaml
 │   ├── require-probes.yaml
 │   └── disallow-privileged-and-root.yaml
+├── k8s-policies/karpenter/         # NODE-level autoscaling rules (rendered by terraform/cluster-addons/karpenter.tf)
+│   ├── ec2nodeclass.yaml.tpl       # which AMI/IAM role/subnets Karpenter is allowed to launch into
+│   └── nodepool.yaml               # which instance shapes, on-demand vs. spot, size cap, consolidation
 ├── helm/devops-sample-api/         # Helm chart
 │   ├── Chart.yaml
 │   ├── values.yaml                 # shared defaults (mocked secret, for standalone use)
@@ -188,15 +191,17 @@ failed before reverting.
 | **EKS** (Elastic Kubernetes Service) | Managed Kubernetes control plane running the Deployment/Service/Ingress/HPA. |
 | **AWS Load Balancer Controller** | A controller running *inside* EKS that watches `Ingress` objects with `ingressClassName: alb` and provisions/updates a real ALB + target groups to match. |
 | **ALB** (Application Load Balancer) | Internet-facing entry point; forwards HTTP(S) traffic to pod IPs directly (`target-type: ip`), bypassing kube-proxy. |
-| **IAM / IRSA** | Grants the AWS Load Balancer Controller (and optionally the app itself) least-privilege AWS permissions via IAM Roles for Service Accounts, not static credentials baked into pods. |
+| **Karpenter** | Node-level autoscaler — watches for `Pending` pods the existing nodes have no room for and launches a right-sized EC2 instance in response (and removes it again once idle). Complements the HPA below, which only scales *pod* replica count, not node capacity. |
+| **IAM / IRSA** | Grants the AWS Load Balancer Controller, Karpenter, External Secrets, and Kyverno (and optionally the app itself) least-privilege AWS permissions via IAM Roles for Service Accounts, not static credentials baked into pods. |
 
 ### Actual setup 
 
 Superseded by Terraform — `terraform/` provisions the VPC, EKS cluster,
 ECR repository, IAM instance profile + IRSA roles, the AWS Load Balancer
-Controller, Metrics Server, External Secrets Operator, Kyverno, the KMS
-signing key, and both the Jenkins and SonarQube EC2 hosts, all in one
-`terraform apply`. Each environment (dev/staging/prod) gets its own full
+Controller, Metrics Server, External Secrets Operator, Kyverno, Karpenter,
+the KMS signing key, and both the Jenkins and SonarQube EC2 hosts, all
+across two ordered `terraform apply` runs (root stack, then
+`cluster-addons/`). Each environment (dev/staging/prod) gets its own full
 copy of all of the above, selected via `terraform workspace select` —
 see `terraform/README.md`'s "Environments" section for why. See
 `terraform/README.md` for the quick version, no manual `eksctl`/console-click sequence is documented here
@@ -282,6 +287,37 @@ targetMemoryUtilizationPercentage: 80
 - Environment-specific thresholds live in `values-<env>.yaml` (e.g. prod
   scales more eagerly, at 60% CPU, and keeps a higher floor of 3 replicas
   for baseline redundancy across AZs).
+
+## Node autoscaling (Karpenter)
+
+The HPA above only scales *pod* replica count — it doesn't help if the
+cluster's existing nodes have no room left to schedule those extra pods.
+That's what [Karpenter](https://karpenter.sh) adds: it watches for
+`Pending` pods the current nodes can't fit, launches a right-sized EC2
+instance in response, and removes it again once it's empty or
+underutilized. It's node-level autoscaling; the HPA above remains
+pod-level — the two work together, not in place of each other.
+
+Installed across the same two ordered Terraform stacks as everything
+else in this project:
+
+| Stack | File | What it does |
+|---|---|---|
+| `terraform/` (root) | `karpenter.tf` | Karpenter's IAM side: controller IRSA role, node IAM role, SQS interruption queue + EventBridge rules, EKS access entry for nodes it launches, and `karpenter.sh/discovery` tags on the private subnets + node security group. |
+| `terraform/cluster-addons/` | `karpenter.tf` | Installs the Karpenter Helm chart into `kube-system`, then applies the `EC2NodeClass`/`NodePool` from `k8s-policies/karpenter/`. |
+
+The `standard-workers` EKS managed node group (`terraform/eks.tf`) is left
+exactly as-is, not replaced — it's still where Karpenter's own controller
+pod, CoreDNS, the ALB controller, Kyverno, and External Secrets run.
+Karpenter needs somewhere stable to run *before* it can provision
+anything, so it never schedules itself onto a node it launched.
+`k8s-policies/karpenter/nodepool.yaml` picks from a flexible set of
+instance families/generations rather than one hardcoded type, and is
+on-demand only by default (the interruption queue for spot is already
+wired up if you turn spot on later). No changes were needed in
+`helm/devops-sample-api` — its `nodeSelector`/`tolerations`/`affinity`
+are all empty by default, so app pods already land on whatever node
+exists, including ones Karpenter launches.
 
 ## Secrets & Config
 
