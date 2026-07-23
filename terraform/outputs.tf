@@ -39,6 +39,21 @@ output "kyverno_role_arn" {
   description = "Read by ../cluster-addons/ via terraform_remote_state — Kyverno admission controller's verify-only IRSA role."
 }
 
+output "karpenter_iam_role_arn" {
+  value       = module.karpenter.iam_role_arn
+  description = "Read by ../cluster-addons/ via terraform_remote_state — Karpenter controller's IRSA role, annotated onto its kube-system:karpenter service account."
+}
+
+output "karpenter_node_iam_role_name" {
+  value       = module.karpenter.node_iam_role_name
+  description = "Read by ../cluster-addons/'s EC2NodeClass (via the ec2nodeclass.yaml.tpl template) — the IAM role instances Karpenter launches assume through the instance profile it manages at runtime."
+}
+
+output "karpenter_queue_name" {
+  value       = module.karpenter.queue_name
+  description = "Read by ../cluster-addons/ via terraform_remote_state — the SQS queue Karpenter watches for spot interruption / rebalance / instance-state-change notifications."
+}
+
 output "app_secret_arn" {
   value = aws_secretsmanager_secret.app_api_key.arn
 }
